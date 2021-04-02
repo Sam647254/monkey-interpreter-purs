@@ -44,7 +44,7 @@ isLetter :: Char -> Boolean
 isLetter ch = 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 
 isDigit :: Char -> Boolean
-isDigit ch = '0' <= ch || ch <= '9'
+isDigit ch = '0' <= ch && ch <= '9'
 
 isDigit' :: State Lexer Boolean
 isDigit' = do
@@ -81,6 +81,14 @@ readIdentifier = do
    lexer' <- get
    pure $ fromCharArray $ slice start lexer'.position $ toCharArray lexer.input
 
+readNumber :: State Lexer String
+readNumber = do
+   lexer <- get
+   let start = lexer.position
+   whileM_ isDigit' readChar
+   lexer' <- get
+   pure $ fromCharArray $ slice start lexer'.position $ toCharArray lexer.input
+
 getNextToken :: State Lexer Token
 getNextToken = do
    whileM_ isWhitespace' readChar
@@ -90,7 +98,10 @@ getNextToken = do
          pure ""
       else if isLetter lexer.current then
          readIdentifier
-      else
+      else if isDigit lexer.current then
+         readNumber
+      else do
+         put (execState readChar lexer)
          pure $ fromCharArray [lexer.current]
    let
       tokenType =
@@ -107,12 +118,9 @@ getNextToken = do
             _ ->
                if isLetter lexer.current then
                   lookupIdentifier ch
+               else if isDigit lexer.current then
+                  Integer
                else
                   Illegal
    let token = Token tokenType ch
-   if not isLetter lexer.current || not isDigit lexer.current then do
-      lexer' <- get
-      put (execState readChar lexer')
-   else
-      pure unit
    pure token
