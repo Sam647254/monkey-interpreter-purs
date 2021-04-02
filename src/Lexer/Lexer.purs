@@ -2,9 +2,12 @@ module Lexer.Lexer where
 
 import Prelude
 
+import Control.Monad.Cont (lift)
+import Control.Monad.Loops (whileM, whileM_)
 import Control.Monad.State (State, execState, get, modify, put)
+import Data.Array (slice)
 import Data.Maybe (fromMaybe)
-import Data.String.CodeUnits (charAt)
+import Data.String.CodeUnits (charAt, fromCharArray, toCharArray)
 import Token.Token (Token(..), TokenType(..))
 
 type Lexer =
@@ -37,10 +40,58 @@ readChar =
             , current = nextChar
             }
 
+isLetter :: Char -> Boolean
+isLetter ch = 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+
+isDigit :: Char -> Boolean
+isDigit ch = '0' <= ch || ch <= '9'
+
+isDigit' :: State Lexer Boolean
+isDigit' = do
+   lexer <- get
+   pure $ isDigit lexer.current
+
+isWhitespace' :: State Lexer Boolean
+isWhitespace' = do
+   lexer <- get
+   pure $ case lexer.current of
+      ' ' -> true
+      '\t' -> true
+      '\n' -> true
+      '\r' -> true
+      _ -> false
+
+isLetter' :: State Lexer Boolean
+isLetter' = do
+   lexer <- get
+   pure $ isLetter lexer.current
+
+lookupIdentifier :: String -> TokenType
+lookupIdentifier ident =
+   case ident of
+     "fn" -> Function
+     "let" -> Let
+     _ -> Identifier
+
+readIdentifier :: State Lexer String
+readIdentifier = do
+   lexer <- get
+   let start = lexer.position
+   whileM_ isLetter' readChar
+   lexer' <- get
+   pure $ fromCharArray $ slice start lexer'.position $ toCharArray lexer.input
+
 getNextToken :: State Lexer Token
 getNextToken = do
+   whileM_ isWhitespace' readChar
    lexer <- get
-   
+   ch <-
+      if lexer.current == '\x00' then
+         pure ""
+      else if isLetter lexer.current then
+         readIdentifier
+      else
+         pure $ fromCharArray [lexer.current]
    let
       tokenType =
          case lexer.current of
@@ -53,8 +104,15 @@ getNextToken = do
             '{' -> LBrace
             '}' -> RBrace
             '\x00' -> EOF
-            _ -> Illegal
-      ch = if lexer.current == '\x00' then "" else show lexer.current
-      token = Token tokenType ch
-   put (execState readChar lexer)
+            _ ->
+               if isLetter lexer.current then
+                  lookupIdentifier ch
+               else
+                  Illegal
+   let token = Token tokenType ch
+   if not isLetter lexer.current || not isDigit lexer.current then do
+      lexer' <- get
+      put (execState readChar lexer')
+   else
+      pure unit
    pure token

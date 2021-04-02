@@ -2,14 +2,28 @@ module Test.LexerTest where
 
 import Prelude
 
-import Control.Monad.State (StateT, evalStateT, get, lift, put, runState)
+import Control.Monad.State (evalStateT, get, lift, put, runState)
 import Data.Foldable (traverse_)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import Lexer.Lexer (Lexer, createLexer, getNextToken)
+import Lexer.Lexer (createLexer, getNextToken)
 import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert (equal)
 import Token.Token (Token(..), TokenType(..))
+
+expectTokens :: Array (Tuple TokenType String) -> String -> Aff Unit
+expectTokens expected input =
+   let
+      expectTokens' =
+         traverse_
+            \(Tuple tokenType token) -> do
+               current <- get
+               let (Tuple (Token nextType nextToken) next) = runState getNextToken current
+               put next
+               lift $ equal tokenType nextType
+               lift $ equal token nextToken
+   in
+   evalStateT (expectTokens' expected) (createLexer input)
 
 lexerTests :: TestSuite
 lexerTests = suite "Lexer tests" do
@@ -17,23 +31,53 @@ lexerTests = suite "Lexer tests" do
       let
          input = "=+(){},;"
          expected =
-            [ Assignment
-            , Plus
-            , LParen
-            , RParen
-            , LBrace
-            , RBrace
-            , Comma
-            , Semicolon
-            , EOF
+            [ Tuple Assignment "="
+            , Tuple Plus "+"
+            , Tuple LParen "("
+            , Tuple RParen ")"
+            , Tuple LBrace "{"
+            , Tuple RBrace "}"
+            , Tuple Comma ","
+            , Tuple Semicolon ";"
+            , Tuple EOF ""
             ]
-         
-         expectTokens :: Array TokenType -> StateT Lexer Aff Unit
-         expectTokens =
-            traverse_
-               \tokenType -> do
-                  current <- get
-                  let (Tuple (Token nextType _) next) = runState getNextToken current
-                  put next
-                  lift $ equal tokenType nextType
-      evalStateT (expectTokens expected) (createLexer input)
+      expectTokens expected input
+   
+   test "tokens 2" do
+      let
+         input = "\
+\let five = 5;\
+\let ten = 10;\
+\\
+\let add = fn(x, y) {\
+\   x + y;\
+\};"
+         expected =
+            [ Tuple Let "let"
+            , Tuple Identifier "five"
+            , Tuple Assignment "="
+            , Tuple Integer "5"
+            , Tuple Semicolon ";"
+            , Tuple Let "let"
+            , Tuple Identifier "ten"
+            , Tuple Assignment "="
+            , Tuple Integer "10"
+            , Tuple Semicolon ";"
+            , Tuple Let "let"
+            , Tuple Identifier "add"
+            , Tuple Assignment "="
+            , Tuple Function "fn"
+            , Tuple LParen "("
+            , Tuple Identifier "x"
+            , Tuple Comma ","
+            , Tuple Identifier "y"
+            , Tuple RParen ")"
+            , Tuple LBrace "{"
+            , Tuple Identifier "x"
+            , Tuple Plus "+"
+            , Tuple Identifier "y"
+            , Tuple Semicolon ";"
+            , Tuple RBrace "}"
+            , Tuple Semicolon ";"
+            ]
+      expectTokens expected input
