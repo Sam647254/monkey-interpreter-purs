@@ -12,6 +12,12 @@ data TokenType
    | Integer
    | Assignment
    | Plus
+   | Minus
+   | Bang
+   | Asterisk
+   | Slash
+   | LT
+   | GT
    | Comma
    | Semicolon
    | LParen
@@ -20,6 +26,11 @@ data TokenType
    | RBrace
    | Function
    | Let
+   | True
+   | False
+   | If
+   | Else
+   | Return
 
 data Token = Token TokenType String
 
@@ -27,5 +38,10 @@ derive instance genericTokenType :: Generic TokenType _
 
 derive instance eqToken :: Eq TokenType
 
+derive instance genericToken :: Generic Token _
+
 instance showTokenType :: Show TokenType where
+   show = genericShow
+
+instance showToken :: Show Token where
    show = genericShow

@@ -51,7 +51,12 @@ lexerTests = suite "Lexer tests" do
 \\
 \let add = fn(x, y) {\
 \   x + y;\
-\};"
+\};\
+\if (5 < 10) {\
+\   return true;\
+\} else {\
+\   return false;\
+\}"
          expected =
             [ Tuple Let "let"
             , Tuple Identifier "five"
@@ -79,5 +84,22 @@ lexerTests = suite "Lexer tests" do
             , Tuple Semicolon ";"
             , Tuple RBrace "}"
             , Tuple Semicolon ";"
+            , Tuple If "if"
+            , Tuple LParen "("
+            , Tuple Integer "5"
+            , Tuple LT "<"
+            , Tuple Integer "10"
+            , Tuple RParen ")"
+            , Tuple LBrace "{"
+            , Tuple Return "return"
+            , Tuple True "true"
+            , Tuple Semicolon ";"
+            , Tuple RBrace "}"
+            , Tuple Else "else"
+            , Tuple LBrace "{"
+            , Tuple Return "return"
+            , Tuple False "false"
+            , Tuple Semicolon ";"
+            , Tuple RBrace "}"
             ]
       expectTokens expected input

@@ -2,12 +2,12 @@ module Lexer.Lexer where
 
 import Prelude
 
-import Control.Monad.Cont (lift)
-import Control.Monad.Loops (whileM, whileM_)
+import Control.Monad.Loops (whileM_)
 import Control.Monad.State (State, execState, get, modify, put)
 import Data.Array (slice)
 import Data.Maybe (fromMaybe)
 import Data.String.CodeUnits (charAt, fromCharArray, toCharArray)
+import Data.Tuple (Tuple(..))
 import Token.Token (Token(..), TokenType(..))
 
 type Lexer =
@@ -40,6 +40,11 @@ readChar =
             , current = nextChar
             }
 
+isNotEOF' :: State (Tuple Lexer Token) Boolean
+isNotEOF' = do
+   (Tuple _ (Token tokenType _)) <- get
+   pure $ tokenType /= EOF
+
 isLetter :: Char -> Boolean
 isLetter ch = 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 
@@ -71,6 +76,11 @@ lookupIdentifier ident =
    case ident of
      "fn" -> Function
      "let" -> Let
+     "true" -> True
+     "false" -> False
+     "if" -> If
+     "else" -> Else
+     "return" -> Return
      _ -> Identifier
 
 readIdentifier :: State Lexer String
@@ -112,6 +122,8 @@ getNextToken = do
             ')' -> RParen
             ',' -> Comma
             '+' -> Plus
+            '<' -> LT
+            '>' -> GT
             '{' -> LBrace
             '}' -> RBrace
             '\x00' -> EOF
