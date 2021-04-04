@@ -2,23 +2,14 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Loops (whileM)
-import Control.Monad.State (State, evalState, get, put, runState)
-import Data.Array (reverse)
+import Data.Array (many, reverse)
+import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import Lexer.Lexer (Lexer, createLexer, getNextToken, isNotEOF')
+import Lexer.Lexer (createLexer, getNextToken, runLexer)
 import Node.ReadLine (createConsoleInterface, noCompletion, prompt, setLineHandler, setPrompt)
-import Token.Token (Token)
-
-readNextToken :: State (Tuple Lexer Token) Token
-readNextToken = do
-   Tuple lexer _ <- get
-   let (Tuple nextToken lexer') = runState getNextToken lexer
-   put $ Tuple lexer' nextToken
-   pure nextToken
 
 main :: Effect Unit
 main = do
@@ -26,12 +17,14 @@ main = do
    setPrompt ">> " interface
 
    let
+      lineHandler :: String -> Effect Unit
       lineHandler input = do
          let lexer = createLexer input
-         let readTokens = whileM isNotEOF' readNextToken
-         let (Tuple first lexer') = runState getNextToken lexer
-         let tokens = evalState readTokens (Tuple lexer' first)
-         traverse_ log $ map show $ reverse $ tokens <> [first]
+         let result = runLexer (many getNextToken) lexer
+         case result of
+            Right (Tuple (Tuple tokens _) _) ->
+               traverse_ log $ map show $ reverse $ tokens
+            Left errors -> log $ show errors
 
          setLineHandler lineHandler interface
          prompt interface

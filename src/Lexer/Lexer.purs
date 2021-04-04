@@ -2,10 +2,15 @@ module Lexer.Lexer where
 
 import Prelude
 
+import Common (Errors, Log)
+import Control.Monad.Except (Except, runExcept, runExceptT, throwError)
 import Control.Monad.Loops (whileM_)
-import Control.Monad.State (State, execState, get, modify, put)
-import Data.Array (slice)
+import Control.Monad.State (State, StateT, execState, get, modify, put, runStateT)
+import Control.Monad.Writer (WriterT, runWriterT)
+import Data.Array (many, slice)
+import Data.Either (Either)
 import Data.Maybe (fromMaybe)
+import Data.Newtype (unwrap)
 import Data.String.CodeUnits (charAt, fromCharArray, toCharArray)
 import Data.Tuple (Tuple(..))
 import Token.Token (Token(..), TokenType(..))
@@ -28,7 +33,7 @@ createLexer input =
    in do
       execState readChar lexer
 
-readChar :: State Lexer Lexer
+readChar :: forall a. Monad a => StateT Lexer a Lexer
 readChar =
    modify
       \lexer ->
@@ -51,25 +56,26 @@ isLetter ch = 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 isDigit :: Char -> Boolean
 isDigit ch = '0' <= ch && ch <= '9'
 
-isDigit' :: State Lexer Boolean
-isDigit' = do
+checkCharType :: forall a. Monad a => (Char -> Boolean) -> StateT Lexer a Boolean
+checkCharType predicate = do
    lexer <- get
-   pure $ isDigit lexer.current
+   pure $ predicate lexer.current
 
-isWhitespace' :: State Lexer Boolean
-isWhitespace' = do
-   lexer <- get
-   pure $ case lexer.current of
+isDigit' :: forall a. Monad a => StateT Lexer a Boolean
+isDigit' = checkCharType isDigit
+
+isWhitespace' :: forall a. Monad a => StateT Lexer a Boolean
+isWhitespace' =
+   checkCharType \s ->
+      case s of
       ' ' -> true
       '\t' -> true
       '\n' -> true
       '\r' -> true
       _ -> false
 
-isLetter' :: State Lexer Boolean
-isLetter' = do
-   lexer <- get
-   pure $ isLetter lexer.current
+isLetter' :: forall a. Monad a => StateT Lexer a Boolean
+isLetter' = checkCharType isLetter
 
 lookupIdentifier :: String -> TokenType
 lookupIdentifier ident =
@@ -83,7 +89,7 @@ lookupIdentifier ident =
      "return" -> Return
      _ -> Identifier
 
-readIdentifier :: State Lexer String
+readIdentifier :: forall a. Monad a => StateT Lexer a String
 readIdentifier = do
    lexer <- get
    let start = lexer.position
@@ -91,7 +97,7 @@ readIdentifier = do
    lexer' <- get
    pure $ fromCharArray $ slice start lexer'.position $ toCharArray lexer.input
 
-readNumber :: State Lexer String
+readNumber :: forall a. Monad a => StateT Lexer a String
 readNumber = do
    lexer <- get
    let start = lexer.position
@@ -99,7 +105,7 @@ readNumber = do
    lexer' <- get
    pure $ fromCharArray $ slice start lexer'.position $ toCharArray lexer.input
 
-getNextToken :: State Lexer Token
+getNextToken :: StateT Lexer (WriterT Log (Except Errors)) Token
 getNextToken = do
    whileM_ isWhitespace' readChar
    lexer <- get
@@ -134,5 +140,18 @@ getNextToken = do
                   Integer
                else
                   Illegal
-   let token = Token tokenType ch
-   pure token
+   if tokenType == Illegal then
+      throwError $ ["Unexpected input" <> ch]
+   else if tokenType == EOF then
+      throwError ["EOF reached"]
+   else do
+      let token = Token tokenType ch
+      pure token
+
+runLexer :: forall output.
+   StateT Lexer (WriterT Log (Except Errors)) output -> Lexer ->
+      Either Errors (Tuple (Tuple output Lexer) Log)
+runLexer action lexer = unwrap $ runExceptT $ runWriterT $ runStateT action lexer
+
+getAllTokens :: Lexer -> Either Errors (Tuple (Tuple (Array Token) Lexer) Log)
+getAllTokens = runLexer (many getNextToken)

@@ -36,9 +36,11 @@ data Token = Token TokenType String
 
 derive instance genericTokenType :: Generic TokenType _
 
-derive instance eqToken :: Eq TokenType
+derive instance eqTokenType :: Eq TokenType
 
 derive instance genericToken :: Generic Token _
+
+derive instance eqToken :: Eq Token
 
 instance showTokenType :: Show TokenType where
    show = genericShow
