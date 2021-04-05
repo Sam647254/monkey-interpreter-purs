@@ -3,12 +3,13 @@ module Lexer.Lexer where
 import Prelude
 
 import Common (Errors, Log)
-import Control.Monad.Except (Except, runExcept, runExceptT, throwError)
+import Control.Monad.Except (Except, runExceptT, throwError)
 import Control.Monad.Loops (whileM_)
 import Control.Monad.State (State, StateT, execState, get, modify, put, runStateT)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (many, slice)
 import Data.Either (Either)
+import Data.List (List, fromFoldable)
 import Data.Maybe (fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String.CodeUnits (charAt, fromCharArray, toCharArray)
@@ -22,6 +23,8 @@ type Lexer =
    , current :: Char
    }
 
+type LexerState = StateT Lexer
+
 createLexer :: String -> Lexer
 createLexer input =
    let
@@ -33,7 +36,7 @@ createLexer input =
    in do
       execState readChar lexer
 
-readChar :: forall a. Monad a => StateT Lexer a Lexer
+readChar :: forall a. Monad a => LexerState a Lexer
 readChar =
    modify
       \lexer ->
@@ -141,7 +144,7 @@ getNextToken = do
                else
                   Illegal
    if tokenType == Illegal then
-      throwError $ ["Unexpected input" <> ch]
+      throwError $ ["Unexpected input: " <> ch]
    else if tokenType == EOF then
       throwError ["EOF reached"]
    else do
@@ -153,5 +156,7 @@ runLexer :: forall output.
       Either Errors (Tuple (Tuple output Lexer) Log)
 runLexer action lexer = unwrap $ runExceptT $ runWriterT $ runStateT action lexer
 
-getAllTokens :: Lexer -> Either Errors (Tuple (Tuple (Array Token) Lexer) Log)
-getAllTokens = runLexer (many getNextToken)
+getAllTokens :: Lexer -> Either Errors (List Token)
+getAllTokens lexer = do
+   (Tuple (Tuple tokens _) _) <- runLexer (many getNextToken) lexer
+   pure $ fromFoldable tokens

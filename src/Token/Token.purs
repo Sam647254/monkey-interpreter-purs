@@ -47,3 +47,6 @@ instance showTokenType :: Show TokenType where
 
 instance showToken :: Show Token where
    show = genericShow
+
+literal :: Token -> String
+literal (Token _ l) = l

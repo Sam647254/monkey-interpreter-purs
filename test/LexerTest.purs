@@ -2,13 +2,12 @@ module Test.LexerTest where
 
 import Prelude
 
-
+import Data.Array (fromFoldable)
 import Data.Either (Either(..))
-import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Lexer.Lexer (createLexer, getAllTokens)
 import Test.Unit (TestSuite, suite, test)
-import Test.Unit.Assert (equal)
+import Test.Unit.Assert (assert, equal)
 import Test.Unit.Console (log)
 import Token.Token (Token(..), TokenType(..))
 
@@ -18,8 +17,10 @@ expectTokens expected input =
       actualTokens = getAllTokens (createLexer input)
    in
    case actualTokens of
-   Left errors -> log $ show errors
-   Right (Tuple (Tuple tokens _) _) -> equal expected tokens
+   Left errors -> do
+      log $ show errors
+      assert "Test failure" false
+   Right tokens -> equal expected $ fromFoldable tokens
 
 lexerTests :: TestSuite
 lexerTests = suite "Lexer tests" do
