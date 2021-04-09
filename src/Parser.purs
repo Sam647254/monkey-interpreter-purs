@@ -2,7 +2,7 @@ module Parser where
 
 import Prelude
 
-import AST (Statement(..), Program)
+import AST (Expression(..), Program, Statement(..))
 import AST as A
 import Common (Log, Errors)
 import Control.Monad.Except (Except, runExcept, throwError)
@@ -74,6 +74,7 @@ parseStatement = do
    statement <-
       case tokenType of
          Let -> parseLetStatement
+         Return -> parseReturnStatement
          t -> throwError ["Parsing " <> (show t) <> " not implemented"]
    nextToken
    pure statement
@@ -89,6 +90,13 @@ parseLetStatement = do
    whileM_ (isNot Semicolon) nextToken
    pure $ LetStatement letToken id (A.Identifier id)
 
+parseReturnStatement :: ParserState Statement
+parseReturnStatement = do
+   parser <- get
+   nextToken
+   whileM_ (isNot Semicolon) nextToken
+   pure $ ReturnStatement parser.currentToken Dummy
+
 expectPeek :: TokenType -> ParserState Unit
 expectPeek tokenType = do
    parser <- get
@@ -96,7 +104,7 @@ expectPeek tokenType = do
       nextToken
       pure unit
    else
-      throwError ["Expected " <> (show tokenType) <> ", saw " <> (show parser.currentToken)]
+      throwError ["Expected " <> (show tokenType) <> ", saw " <> (show parser.peekToken)]
 
 currentTokenIs :: Parser -> TokenType -> Boolean
 currentTokenIs parser tokenType =
