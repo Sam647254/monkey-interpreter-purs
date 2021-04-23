@@ -2,7 +2,7 @@ module Parser where
 
 import Prelude
 
-import AST (Expression(..), Program, Statement(..))
+import AST (Expression(..), Program(..), Statement(..))
 import AST as A
 import Common (Log, Errors)
 import Control.Monad.Except (Except, runExcept, throwError)
@@ -65,7 +65,7 @@ createParser _ = Nothing
 parseProgram :: ParserState Program
 parseProgram = do
    statements <- whileM (isNot EOF) parseStatement
-   pure { statements: reverse statements }
+   pure $ Program { statements: reverse statements }
 
 parseStatement :: ParserState Statement
 parseStatement = do
@@ -85,10 +85,10 @@ parseLetStatement = do
    let letToken = parser.currentToken
    expectPeek T.Identifier
    parser' <- get
-   let id = { token: parser'.currentToken, value: literal parser'.currentToken }
+   let id = A.Identifier { token: parser'.currentToken, value: literal parser'.currentToken }
    expectPeek Assignment
    whileM_ (isNot Semicolon) nextToken
-   pure $ LetStatement letToken id (A.Identifier id)
+   pure $ LetStatement letToken id (A.Id id)
 
 parseReturnStatement :: ParserState Statement
 parseReturnStatement = do

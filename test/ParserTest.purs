@@ -2,7 +2,7 @@ module ParserTest where
 
 import Prelude
 
-import AST (Statement(..))
+import AST (Identifier(..), Program(..), Statement(..))
 import Data.Array (zip)
 import Data.Either (Either(..))
 import Data.Traversable (traverse)
@@ -27,13 +27,13 @@ parserTests = suite "Parser tests" do
          result = runParser $ createLexer input
 
          checkStatement :: (Tuple Statement String) -> Aff Unit
-         checkStatement (Tuple (LetStatement token id _) expected) = do
+         checkStatement (Tuple (LetStatement token (Identifier id) _) expected) = do
             equal "let" $ literal token
             equal expected id.value
          checkStatement _ = do
             assert "Test failed" false
       case result of
-         Right program -> do
+         Right (Program program) -> do
             let statements = program.statements
             _ <- traverse checkStatement (zip statements expected)
             pure unit
@@ -54,7 +54,7 @@ parserTests = suite "Parser tests" do
             assert "Not a return statement" false
          result = runParser $ createLexer input
       case result of
-         Right program -> do
+         Right (Program program) -> do
             let statements = program.statements
             _ <- traverse checkStatement statements
             pure unit
